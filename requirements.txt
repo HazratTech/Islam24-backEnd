@@ -1,0 +1,6 @@
+firebase-admin
+secure-smtplib
+python-dotenv
+fastapi
+uvicorn
+gunicorn
