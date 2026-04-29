@@ -74,3 +74,26 @@ async def reset_password(request: base_models.ResetPasswordRequest):
         return JSONResponse(content={"message": "Password reset successfully"}, status_code=200)
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+
+
+# Define the assetlinks.json content
+assetlinks = [
+  {
+    "relation": [
+      "delegate_permission/common.handle_all_urls",
+      "delegate_permission/common.get_login_creds"
+    ],
+    "target": {
+      "namespace": "android_app",
+      "package_name": "com.hazrat.islam24",
+      "sha256_cert_fingerprints": [
+        "00:AE:C8:C3:1A:A0:A1:E6:EF:4D:26:01:2B:41:51:05:F8:CC:49:DA:F3:DD:CA:CD:07:BC:22:7C:61:27:FC:E6"
+      ]
+    }
+  }
+]
+
+@router.get("/.well-known/assetlinks.json")
+async def get_assetlinks():
+    return JSONResponse(content=assetlinks)

@@ -1,0 +1,51 @@
+name: Build and Deploy Islam24 backend
+
+on:
+  push:
+    branches: [ main ]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name : Checkout code
+        uses: actions/checkout@v4
+
+      - name: Login to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Build and Push Docker Image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          push: true
+          tags: ${{secrets.DOCKERHUB_USERNAME}}/islam24-backend:latest
+
+  deploy :
+    runs-on: self-hosted
+    needs: build
+
+    steps:
+      - name: Pull and restart Container
+        run: |
+          docker pull ${{secrets.DOCKERHUB_USERNAME}}/islam24-backend:latest
+          
+          docker stop islam24-backend || true
+          docker rm islam24-backend || true
+          
+          docker run -d \
+            --name islam24-backend \
+            --network custom_bridge \
+            --ip 172.25.0.10 \
+            -e FIREBASE_KEY_PATH="/app/firebase/islam-24-firebase.json" \
+            --env-file /home/envs/islam24-backend.env \
+            -v /home/envs/firebase/islam-24-firebase.json:/app/firebase/islam-24-firebase.json \
+            -p 8082:8082 \
+            --restart unless-stopped \
+            ${{secrets.DOCKERHUB_USERNAME}}/islam24-backend:latest
+
+          sleep 5
+          docker ps | grep islam24-backend
