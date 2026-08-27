@@ -15,13 +15,14 @@ class JwtService {
     private val secretKey: SecretKey = Keys.hmacShaKeyFor(System.getenv("JWT_SECRET").toByteArray())
 
     fun generateAccessToken(userId: UUID): String {
+        val defaultExpirationMillis = 24L * 60 * 60 * 1000L // 24 hours
+        val expirationMillis = System.getenv("JWT_EXPIRATION")?.toLongOrNull() ?: defaultExpirationMillis
+
         return Jwts.builder()
             .subject(userId.toString())
             .issuedAt(Date())
             .expiration(
-                Date(
-                    System.currentTimeMillis() + System.getenv("JWT_EXPIRATION").toLong()
-                )
+                Date(System.currentTimeMillis() + expirationMillis)
             )
             .signWith(secretKey)
             .compact()

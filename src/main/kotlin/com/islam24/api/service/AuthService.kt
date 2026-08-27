@@ -45,21 +45,29 @@ class AuthService(
 
     @Transactional
     fun refresh(request: RefreshRequest): RefreshResponse {
-
         val incomingHash = hashToken(token = request.refreshToken)
         val refreshToken =
             refreshTokenRepository.findByTokenHash(token = incomingHash) ?: throw InvalidRefreshTokenException()
 
         if (refreshToken.revoked) {
-            throw InvalidRefreshTokenException()
-        }
-        if (refreshToken.expiresAt.isBefore(Instant.now())) {
-            refreshToken.revoked = true
-            refreshToken.updatedAt = Instant.now()
+            // Grace period: If token was rotated within the last 45 seconds (e.g. parallel requests during app launch / sync),
+            // safely issue a new access token instead of killing the user session.
+            val gracePeriodWindow = Instant.now().minusSeconds(45)
+            if (refreshToken.updatedAt.isAfter(gracePeriodWindow) && refreshToken.expiresAt.isAfter(Instant.now())) {
+                val accessToken = jwtService.generateAccessToken(userId = refreshToken.user.id)
+                return RefreshResponse(accessToken = accessToken, refreshToken = request.refreshToken)
+            }
             throw InvalidRefreshTokenException()
         }
 
-        // Revoked current token (Token Rotation)
+        if (refreshToken.expiresAt.isBefore(Instant.now())) {
+            refreshToken.revoked = true
+            refreshToken.updatedAt = Instant.now()
+            refreshTokenRepository.save(refreshToken)
+            throw InvalidRefreshTokenException()
+        }
+
+        // Revoke current token (Token Rotation)
         refreshToken.revoked = true
         refreshToken.updatedAt = Instant.now()
         refreshTokenRepository.save(refreshToken)
