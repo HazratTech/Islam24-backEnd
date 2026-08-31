@@ -15,8 +15,8 @@ class RefreshTokenService(private val refreshTokenRepository: RefreshTokenReposi
         val rawToken = UUID.randomUUID().toString()
         val hashToken = hashToken(token = rawToken)
 
-        // Default to 90 days in milliseconds if environment variable is not configured
-        val defaultExpiryMillis = 90L * 24 * 60 * 60 * 1000L
+        // Long-lived device session (365 days / 1 year) like YouTube, Spotify, and Telegram
+        val defaultExpiryMillis = 365L * 24 * 60 * 60 * 1000L
         val expiryMillis = System.getenv("REFRESH_EXPIRE_MILI")?.toLongOrNull() ?: defaultExpiryMillis
 
         val refreshToken = RefreshToken(

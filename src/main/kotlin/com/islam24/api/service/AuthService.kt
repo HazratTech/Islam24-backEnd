@@ -50,9 +50,9 @@ class AuthService(
             refreshTokenRepository.findByTokenHash(token = incomingHash) ?: throw InvalidRefreshTokenException()
 
         if (refreshToken.revoked) {
-            // Grace period: If token was rotated within the last 45 seconds (e.g. parallel requests during app launch / sync),
+            // Grace period: If token was rotated within the last 5 minutes (e.g. parallel requests, offline sync retries),
             // safely issue a new access token instead of killing the user session.
-            val gracePeriodWindow = Instant.now().minusSeconds(45)
+            val gracePeriodWindow = Instant.now().minusSeconds(300)
             if (refreshToken.updatedAt.isAfter(gracePeriodWindow) && refreshToken.expiresAt.isAfter(Instant.now())) {
                 val accessToken = jwtService.generateAccessToken(userId = refreshToken.user.id)
                 return RefreshResponse(accessToken = accessToken, refreshToken = request.refreshToken)
