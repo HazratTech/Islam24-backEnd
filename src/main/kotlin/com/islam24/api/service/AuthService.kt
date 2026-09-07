@@ -50,13 +50,6 @@ class AuthService(
             refreshTokenRepository.findByTokenHash(token = incomingHash) ?: throw InvalidRefreshTokenException()
 
         if (refreshToken.revoked) {
-            // Grace period: If token was rotated within the last 5 minutes (e.g. parallel requests, offline sync retries),
-            // safely issue a new access token instead of killing the user session.
-            val gracePeriodWindow = Instant.now().minusSeconds(300)
-            if (refreshToken.updatedAt.isAfter(gracePeriodWindow) && refreshToken.expiresAt.isAfter(Instant.now())) {
-                val accessToken = jwtService.generateAccessToken(userId = refreshToken.user.id)
-                return RefreshResponse(accessToken = accessToken, refreshToken = request.refreshToken)
-            }
             throw InvalidRefreshTokenException()
         }
 
@@ -67,14 +60,15 @@ class AuthService(
             throw InvalidRefreshTokenException()
         }
 
-        // Revoke current token (Token Rotation)
-        refreshToken.revoked = true
+        // Rolling Expiration: Extend the 365-day (1 year) lifespan on active use (Perpetual Login)
+        val defaultExpiryMillis = 365L * 24 * 60 * 60 * 1000L
+        val expiryMillis = System.getenv("REFRESH_EXPIRE_MILI")?.toLongOrNull() ?: defaultExpiryMillis
+        refreshToken.expiresAt = Instant.now().plusMillis(expiryMillis)
         refreshToken.updatedAt = Instant.now()
         refreshTokenRepository.save(refreshToken)
 
-        val newRawRefreshToken = refreshTokenService.create(user = refreshToken.user)
         val accessToken = jwtService.generateAccessToken(userId = refreshToken.user.id)
-        return RefreshResponse(accessToken = accessToken, refreshToken = newRawRefreshToken)
+        return RefreshResponse(accessToken = accessToken, refreshToken = request.refreshToken)
     }
 
     @Transactional
@@ -83,6 +77,6 @@ class AuthService(
         val refreshToken = refreshTokenRepository.findByTokenHash(token = incomingHash) ?: throw InvalidRefreshTokenException()
         refreshToken.revoked = true
         refreshToken.updatedAt = Instant.now()
+        refreshTokenRepository.save(refreshToken)
     }
-
 }
